@@ -21,7 +21,7 @@ COPY econ.stg_state_year (
   median_income,
   unemployment_rate
 )
-FROM 'C:/projects/python-policy-project/data/processed/state_year_panel.csv'
+FROM 'data/sample/state_year_panel_sample.csv'
 WITH (FORMAT csv, HEADER true);
 
 -- 2) Rebuild dim + fact (truncate both together due to FK)
