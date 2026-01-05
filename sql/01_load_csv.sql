@@ -1,6 +1,13 @@
 -- 01_load_csv.sql
 -- Load full panel CSV into staging, rebuild dim + fact.
 -- Update the path in COPY to your local file location.
+--
+-- For demo purposes, a small sample CSV is provided in:
+--   data/sample/state_year_panel_sample.csv
+--
+-- The full Census/SAIPE-derived panel is not committed due to size.
+-- To load the full dataset, update the COPY path below or use
+-- pgAdmin's Import/Export UI to load into econ.stg_state_year.
 
 -- 1) Clear staging then load CSV
 TRUNCATE TABLE econ.stg_state_year;
