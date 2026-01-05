@@ -148,6 +148,6 @@ It mirrors the structure of production analytics databases used in policy analys
 
 ## Author
 
-**Trevor Reader**
-B.A. Mathematics & Statistics 
-Analytics Engineering • Economic Data • SQL
+**Trevor Reader**  
+B.A. Mathematics & Statistics | Analytics Engineering • Economic Data • SQL
+
