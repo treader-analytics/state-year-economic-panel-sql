@@ -1,163 +1,153 @@
-# State-Year Economic Panel (PostgreSQL)
+# State–Year Economic Panel (PostgreSQL)
 
-This project builds a clean, analysis-ready **state–year economic panel** in PostgreSQL using reproducible schema design, a staging-based CSV ingestion pipeline, and advanced SQL analytics.
+## Overview
+This project builds a **reproducible, analysis‑ready state–year economic panel** in PostgreSQL.  
+The pipeline follows an analytics‑engineering pattern:
 
-It is designed as the **database layer** for a larger Census/SAIPE-based data pipeline and demonstrates real-world SQL practices used in analytics engineering, public policy analysis, and data science workflows.
+**Raw CSV → Staging → Fact & Dimension tables → Indexed analytics view → Analytical SQL**
 
----
-
-## Project Overview
-
-The database models U.S. state-level economic indicators at an annual frequency, including:
-
-- Poverty rate  
-- Median household income  
-- Unemployment rate  
-
-The final deliverable is an analysis-ready SQL view (`econ.vw_state_year_panel`) intended for downstream use in Python, R, or BI tools.
-
-Key objectives:
-- Demonstrate relational schema design (dimension + fact tables)
-- Enforce data validity with constraints
-- Separate raw data ingestion from analytical logic
-- Showcase window functions and analytical SQL patterns
-- Provide a reproducible, script-based setup
+The final deliverable is a clean panel dataset designed for time‑series and cross‑sectional analysis of U.S. state‑level economic conditions.
 
 ---
 
-## Data Source & Pipeline Context
+## Final Output: Analytics View
 
-The full dataset used by this project is derived from U.S. Census Bureau sources (including SAIPE) and is generated upstream in a Python-based data processing pipeline.
+### `econ.vw_state_year_panel`
+This view is the **primary product** of the project and serves as the contract for all downstream analysis.
 
-That upstream project performs:
-- raw Census/SAIPE ingestion
-- cleaning and reshaping
-- construction of a processed **state–year panel CSV**
+**Schema**
+- `state_fips`
+- `state_abbr`
+- `state_name`
+- `year`
+- `poverty_rate`
+- `median_income`
+- `unemployment_rate`
 
-This SQL repository represents the **database and analytics layer** built on top of that processed output.
-
-> Raw Census/SAIPE data are **not committed** to this repository due to size.
-
----
-
-## Repository Structure
-
-```
-.
-├─ README.md
-├─ sql/
-│  ├─ 00_schema.sql        # schema, dimension, fact, and staging tables
-│  ├─ 01_load_csv.sql      # CSV ingestion and table rebuild pipeline
-│  ├─ 02_views.sql         # analysis-ready panel view
-│  ├─ 03_indexes.sql       # performance-oriented indexes
-│  └─ 04_analysis.sql      # example analytical queries
-├─ data/
-│  └─ sample/
-│     └─ state_year_panel_sample.csv  # small demo dataset
-└─ .gitignore
+### Example rows
+_Note: The final column shown below represents the year-over-year change in poverty rate (derived via window functions in analysis queries)._
+```text
+CA | 1989 | 12.70
+CA | 1993 | 17.40 | +4.70
+CA | 2000 | 12.70 | -1.00
+CA | 2010 | 15.80 | +1.60
+CA | 2020 | 11.50 | -0.30
+FL | 1989 | 12.90
+FL | 2000 | 11.70 | -0.70
+FL | 2010 | 16.50 | +1.50
+TX | 1989 | 17.70
+TX | 2000 | 14.60 | -0.50
+TX | 2010 | 17.90 | +0.80
+TX | 2020 | 13.40 | -0.20
 ```
 
+Values shown illustrate long‑run trends and business‑cycle sensitivity across large U.S. states.
+
 ---
 
-## Sample vs Full Data
+## Data Model
 
-### Sample Data (Included)
-A small sample CSV is provided in:
+### Dimension Table
+**`econ.dim_state`**
+- One row per state
+- Stores stable identifiers (FIPS, abbreviation, name)
+- Joined to fact table via `state_fips`
 
+### Fact Table
+**`econ.fact_state_year`**
+- Grain: **one row per state per year**
+- Stores annual economic measures:
+  - poverty rate
+  - median household income
+  - unemployment rate
+
+### Staging Table
+**`econ.stg_state_year`**
+- Raw CSV landing table
+- Decouples ingestion from analytics schema
+- Enables full rebuilds and reproducibility
+
+---
+
+## Example Analyses
+
+### 1. Year‑over‑Year Poverty Rate Changes
+Using window functions to identify large inter‑temporal shifts:
+
+```sql
+poverty_rate
+- LAG(poverty_rate) OVER (
+    PARTITION BY state_fips
+    ORDER BY year
+) AS poverty_yoy_change
 ```
-data/sample/state_year_panel_sample.csv
+
+**Observed patterns**
+- Sharp increases during recessionary periods (early 1990s, Great Recession)
+- Broad declines during sustained expansions (late 1990s, mid‑2010s)
+- Pandemic‑era volatility with heterogeneous state responses
+
+---
+
+### 2. Within‑Year Poverty Ranking
+States are ranked within each year using `DENSE_RANK()`:
+
+```sql
+DENSE_RANK() OVER (
+  PARTITION BY year
+  ORDER BY poverty_rate DESC
+)
 ```
 
-This file allows anyone to:
-- run the full SQL pipeline locally
-- validate schema and queries
-- explore example analyses quickly
+**Illustrative years**
+- **1989:** Mississippi, Louisiana, and New Mexico rank highest
+- **2000:** Broad nationwide improvement, lower dispersion
+- **2010:** Post‑recession re‑ranking with elevated poverty across most states
+- **2020:** Persistent regional clustering in the Southeast and Southwest
 
-### Full Data (Not Included)
-The full Census/SAIPE-derived panel is intentionally excluded due to size.
-
-To load the full dataset:
-- update the CSV path in `sql/01_load_csv.sql`, **or**
-- use pgAdmin’s Import/Export UI to load the CSV into `econ.stg_state_year`
-
-This mirrors real-world data engineering workflows where raw data is environment-specific.
+This demonstrates cross‑sectional comparison within a consistent panel structure.
 
 ---
 
-## How to Run the Project
+### 3. Data Quality Audit
+Basic completeness checks on the final analytics view:
 
-Run the SQL scripts in the following order using pgAdmin or `psql`:
+```text
+total_rows | poverty_nulls | income_nulls | unemployment_nulls
+1581       | 0             | 0            | 0
+```
 
-1. **Create schema and tables**
-   ```
-   sql/00_schema.sql
-   ```
-
-2. **Load CSV data and rebuild tables**
-   ```
-   sql/01_load_csv.sql
-   ```
-
-3. **Create analysis-ready view**
-   ```
-   sql/02_views.sql
-   ```
-
-4. **Add indexes**
-   ```
-   sql/03_indexes.sql
-   ```
-
-5. **Run example analyses**
-   ```
-   sql/04_analysis.sql
-   ```
+All measures are fully populated across the panel.
 
 ---
 
-## Example Analyses Included
+## Reproducibility
 
-The analysis script demonstrates common analytical SQL patterns, including:
+Scripts are intended to be run **top‑to‑bottom in numeric order**:
 
-- Ranking states by poverty rate within each year (`DENSE_RANK`)
-- Year-over-year poverty changes using `LAG`
-- Rolling multi-year averages with window frames
-- Within-year z-scores for cross-time comparability
-- Segmentation of high-poverty / low-income states
-- Data quality audits (null checks)
+1. `00_schema.sql` – schema, tables, constraints
+2. `01_staging_load.sql` – CSV ingestion
+3. `02_dimensions.sql` – dimension build
+4. `03_facts.sql` – fact table build
+5. `04_analysis.sql` – analytical queries
 
-These queries are written to be:
-- readable
-- reusable
-- representative of real analytics work
+A sample CSV is included to allow the full pipeline to be executed locally.
 
 ---
 
-## Design Notes
+## Why This Project
+This project emphasizes:
+- relational data modeling
+- clear grain definition
+- window‑function analytics
+- reproducible database pipelines
 
-- A **staging table** is used to decouple raw CSV structure from analytical tables
-- Primary and foreign keys enforce relational integrity
-- Constraints prevent invalid values from entering the database
-- The final view isolates analytical consumers from underlying schema complexity
-
----
-
-## Intended Use
-
-This project is intended to demonstrate:
-- SQL proficiency beyond basic SELECT statements
-- Comfort with real-world data ingestion patterns
-- Analytical thinking using window functions
-- Clean project organization suitable for collaboration
-
-It can serve as:
-- a standalone SQL portfolio project
-- the database layer for a Python or R analysis
-- a foundation for BI dashboards or reporting
+It mirrors the structure of production analytics databases used in policy analysis, public health, and economic research.
 
 ---
 
 ## Author
 
-**Trevor Reader**  
-Background in Mathematics & Statistics with a focus on applied data analysis, public policy, and reproducible analytics workflows.
+**Trevor Reader**
+B.A. Mathematics & Statistics 
+Analytics Engineering • Economic Data • SQL
